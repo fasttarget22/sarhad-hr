@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% set page = "documents" %}
+{% block page_title %}<span data-t="nav_documents">Documents</span>{% endblock %}
+
+{% block content %}
+<div class="flex-between section-gap">
+  <div class="doc-status-bar">
+    <div class="doc-stat"><div class="dot dot-green"></div><span data-t="doc_valid">Valid</span></div>
+    <div class="doc-stat"><div class="dot dot-orange"></div><span data-t="doc_expiring">Expiring Soon</span></div>
+    <div class="doc-stat"><div class="dot dot-red"></div><span data-t="doc_critical">Critical</span></div>
+    <div class="doc-stat"><div class="dot dot-dark"></div><span data-t="doc_expired">Expired</span></div>
+  </div>
+  <button class="btn btn-primary" onclick="openModal()">
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <span data-t="doc_add">Add Document</span>
+  </button>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th data-t="emp_name">Employee</th>
+          <th data-t="doc_type">Type</th>
+          <th data-t="doc_number">Number</th>
+          <th data-t="doc_expiry">Expiry</th>
+          <th data-t="doc_status">Status</th>
+          <th>Days</th>
+        </tr>
+      </thead>
+      <tbody id="doc-body">
+        <tr><td colspan="6" style="text-align:center;padding:30px;color:#9ca3af;" data-t="loading">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 data-t="doc_add">Add Document</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label data-t="emp_id">Employee ID</label>
+          <input class="form-control" id="f-empid" placeholder="SE001">
+        </div>
+        <div class="form-group">
+          <label data-t="emp_name">Employee Name</label>
+          <input class="form-control" id="f-empname" placeholder="Full Name">
+        </div>
+        <div class="form-group">
+          <label data-t="doc_type">Document Type</label>
+          <select class="form-control" id="f-doctype">
+            <option value="Passport" data-t="doc_passport">Passport</option>
+            <option value="UAE Visa" data-t="doc_visa">UAE Visa</option>
+            <option value="Emirates ID" data-t="doc_eid">Emirates ID</option>
+            <option value="Labour Card" data-t="doc_labour">Labour Card</option>
+            <option value="Medical Insurance" data-t="doc_insurance">Medical Insurance</option>
+            <option value="Driving License" data-t="doc_license">Driving License</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label data-t="doc_number">Document Number</label>
+          <input class="form-control" id="f-docnum" placeholder="Document Number">
+        </div>
+        <div class="form-group">
+          <label data-t="doc_issue">Issue Date</label>
+          <input class="form-control" id="f-issue" type="date">
+        </div>
+        <div class="form-group">
+          <label data-t="doc_expiry">Expiry Date</label>
+          <input class="form-control" id="f-expiry" type="date">
+        </div>
+        <div class="form-group" style="grid-column:1/-1;">
+          <label>Notes</label>
+          <input class="form-control" id="f-notes" placeholder="Optional notes">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()" data-t="cancel">Cancel</button>
+      <button class="btn btn-primary" onclick="saveDoc()" data-t="save">Save</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', loadDocs);
+
+function loadDocs() {
+  fetch('/api/documents')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var tbody = document.getElementById('doc-body');
+      if (!data.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#9ca3af;">' + t('no_data') + '</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.map(function(d) {
+        var sc = {Valid:'badge-success', Expiring:'badge-warning', Critical:'badge-danger', Expired:'badge-gray'}[d.Status] || 'badge-gray';
+        var sl = t('doc_' + (d.Status||'valid').toLowerCase()) || d.Status;
+        var daysText = d.DaysLeft !== null && d.DaysLeft !== undefined
+          ? (d.DaysLeft >= 0 ? d.DaysLeft + ' ' + t('days_left') : Math.abs(d.DaysLeft) + ' ' + t('days_ago'))
+          : '—';
+        return '<tr>' +
+          '<td><strong>' + (d.EmpName||d.EmpID) + '</strong></td>' +
+          '<td>📄 ' + (d.DocType||'—') + '</td>' +
+          '<td><code>' + (d.DocNumber||'—') + '</code></td>' +
+          '<td>' + (d.ExpiryDate||'—') + '</td>' +
+          '<td><span class="badge ' + sc + '">' + sl + '</span></td>' +
+          '<td style="font-size:12px;color:' + (d.DaysLeft < 30 ? '#dc2626' : d.DaysLeft < 60 ? '#d97706' : '#16a34a') + ';">' + daysText + '</td>' +
+        '</tr>';
+      }).join('');
+    });
+}
+
+function openModal() { document.getElementById('modal').classList.add('open'); }
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+function saveDoc() {
+  fetch('/api/documents', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      emp_id: document.getElementById('f-empid').value,
+      emp_name: document.getElementById('f-empname').value,
+      doc_type: document.getElementById('f-doctype').value,
+      doc_number: document.getElementById('f-docnum').value,
+      issue_date: document.getElementById('f-issue').value,
+      expiry_date: document.getElementById('f-expiry').value,
+      notes: document.getElementById('f-notes').value
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d) {
+    if (d.success) { showToast(t('success'), 'success'); closeModal(); loadDocs(); }
+    else showToast(t('error'), 'error');
+  });
+}
+</script>
+{% endblock %}

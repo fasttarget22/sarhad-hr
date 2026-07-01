@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% set page = "tasks" %}
+{% block page_title %}<span data-t="nav_tasks">Tasks</span>{% endblock %}
+
+{% block content %}
+<div class="flex-between section-gap">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <button class="btn btn-outline btn-sm" onclick="filterTasks('all')">All</button>
+    <button class="btn btn-outline btn-sm" onclick="filterTasks('Pending')" data-t="task_pending">Pending</button>
+    <button class="btn btn-outline btn-sm" onclick="filterTasks('In Progress')" data-t="task_inprogress">In Progress</button>
+    <button class="btn btn-outline btn-sm" onclick="filterTasks('Completed')" data-t="task_done">Completed</button>
+  </div>
+  {% if user.role == 'Admin' %}
+  <button class="btn btn-primary" onclick="openModal()">
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <span data-t="task_add">Assign Task</span>
+  </button>
+  {% endif %}
+</div>
+
+<div id="task-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px;"></div>
+
+<!-- Assign Modal (Admin) -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 data-t="task_add">Assign Task</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group" style="grid-column:1/-1;">
+          <label data-t="task_title">Task Title</label>
+          <input class="form-control" id="f-title" placeholder="Task title">
+        </div>
+        <div class="form-group" style="grid-column:1/-1;">
+          <label data-t="task_desc">Description</label>
+          <input class="form-control" id="f-desc" placeholder="Details...">
+        </div>
+        <div class="form-group">
+          <label data-t="task_assign">Assign To (ID)</label>
+          <input class="form-control" id="f-ato" placeholder="SE001">
+        </div>
+        <div class="form-group">
+          <label data-t="emp_name">Employee Name</label>
+          <input class="form-control" id="f-aname" placeholder="Name">
+        </div>
+        <div class="form-group">
+          <label data-t="task_type">Task Type</label>
+          <select class="form-control" id="f-ttype">
+            <option>Office</option><option>Trip/Delivery</option><option>Vehicle</option><option>Client</option><option>Remote</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label data-t="task_priority">Priority</label>
+          <select class="form-control" id="f-pri">
+            <option>Low</option><option>Medium</option><option>High</option><option>Urgent</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label data-t="task_deadline">Deadline</label>
+          <input class="form-control" id="f-dead" type="datetime-local">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()" data-t="cancel">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTask()" data-t="save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Update Status Modal (Employee) -->
+<div class="modal-overlay" id="update-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 data-t="task_update">Update Status</h3>
+      <button class="modal-close" onclick="document.getElementById('update-modal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group" style="margin-bottom:14px;">
+        <label data-t="task_status">Status</label>
+        <select class="form-control" id="u-status">
+          <option>Pending</option><option>In Progress</option><option>Completed</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Note</label>
+        <input class="form-control" id="u-note" placeholder="Completion note...">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="document.getElementById('update-modal').classList.remove('open')" data-t="cancel">Cancel</button>
+      <button class="btn btn-primary" onclick="doUpdate()" data-t="save">Save</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var allTasks = [];
+var updateId = null;
+
+document.addEventListener('DOMContentLoaded', loadTasks);
+
+function priorityClass(p) {
+  return {'Urgent':'priority-urgent','High':'priority-high','Medium':'priority-medium','Low':'priority-low'}[p] || 'priority-low';
+}
+function statusBadge(s) {
+  return {'Pending':'badge-warning','In Progress':'badge-info','Completed':'badge-success'}[s] || 'badge-gray';
+}
+function statusIcon(s) {
+  return {'Pending':'⏳','In Progress':'🔄','Completed':'✅'}[s] || '📋';
+}
+
+function loadTasks() {
+  fetch('/api/tasks')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      allTasks = data;
+      renderTasks(data);
+    });
+}
+
+function renderTasks(data) {
+  var grid = document.getElementById('task-grid');
+  if (!data.length) {
+    grid.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><p>' + t('no_data') + '</p></div>';
+    return;
+  }
+  grid.innerHTML = data.map(function(task) {
+    return '<div class="card">' +
+      '<div class="card-header">' +
+        '<div style="flex:1;">' +
+          '<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;">' +
+            '<span class="badge ' + priorityClass(task.Priority) + '">' + (task.Priority||'—') + '</span>' +
+            '<span class="badge badge-gray" style="font-size:10px;">' + (task.TaskType||'—') + '</span>' +
+          '</div>' +
+          '<h3 style="font-size:14px;">' + statusIcon(task.Status) + ' ' + (task.Title||'—') + '</h3>' +
+        '</div>' +
+      '</div>' +
+      '<div class="card-body">' +
+        '<p style="font-size:12px;color:#6b7c93;margin-bottom:12px;">' + (task.Description||'') + '</p>' +
+        '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:8px;">' +
+          '<span style="color:#6b7c93;">👤 ' + (task.AssignedName||task.AssignedTo||'—') + '</span>' +
+          '<span class="badge ' + statusBadge(task.Status) + '">' + (task.Status||'Pending') + '</span>' +
+        '</div>' +
+        (task.Deadline ? '<div style="font-size:11px;color:#9ca3af;">📅 ' + task.Deadline + '</div>' : '') +
+        (task.CompletionNote ? '<div style="font-size:11px;color:#6b7c93;margin-top:6px;">📝 ' + task.CompletionNote + '</div>' : '') +
+        '<div style="margin-top:12px;">' +
+          '<button class="btn btn-outline btn-sm btn-block" onclick="openUpdate(\'' + task.TaskID + '\',\'' + (task.Status||'Pending') + '\')" data-t="task_update">Update Status</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function filterTasks(status) {
+  if (status === 'all') renderTasks(allTasks);
+  else renderTasks(allTasks.filter(function(t){ return t.Status === status; }));
+}
+
+function openModal() { document.getElementById('modal').classList.add('open'); }
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+function openUpdate(tid, status) {
+  updateId = tid;
+  document.getElementById('u-status').value = status;
+  document.getElementById('u-note').value = '';
+  document.getElementById('update-modal').classList.add('open');
+}
+
+function doUpdate() {
+  fetch('/api/tasks/' + updateId + '/update', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({status: document.getElementById('u-status').value, note: document.getElementById('u-note').value})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d) {
+    if (d.success) { showToast(t('success'), 'success'); document.getElementById('update-modal').classList.remove('open'); loadTasks(); }
+  });
+}
+
+function saveTask() {
+  fetch('/api/tasks', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      title: document.getElementById('f-title').value,
+      description: document.getElementById('f-desc').value,
+      assigned_to: document.getElementById('f-ato').value,
+      assigned_name: document.getElementById('f-aname').value,
+      task_type: document.getElementById('f-ttype').value,
+      priority: document.getElementById('f-pri').value,
+      deadline: document.getElementById('f-dead').value
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d) {
+    if (d.success) { showToast(t('success'), 'success'); closeModal(); loadTasks(); }
+  });
+}
+</script>
+{% endblock %}

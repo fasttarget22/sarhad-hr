@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% set page = "attendance" %}
+{% block page_title %}<span data-t="nav_attendance">Attendance</span>{% endblock %}
+
+{% block content %}
+<div class="clock-btns" style="max-width:500px;">
+  <button class="clock-btn clock-btn-in" onclick="doClock('in')">
+    <span class="clock-icon">🟢</span>
+    <span data-t="att_clockin">Clock In</span>
+    <small id="time-now" style="font-size:11px;opacity:0.85;"></small>
+  </button>
+  <button class="clock-btn clock-btn-out" onclick="doClock('out')">
+    <span class="clock-icon">🔴</span>
+    <span data-t="att_clockout">Clock Out</span>
+  </button>
+</div>
+<div id="clock-result" style="margin-bottom:20px;padding:14px 18px;border-radius:10px;display:none;font-size:14px;font-weight:600;"></div>
+
+<div class="card">
+  <div class="card-header">
+    <h3 data-t="nav_attendance">Attendance Records</h3>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th data-t="emp_name">Name</th>
+          <th data-t="att_date">Date</th>
+          <th data-t="att_in">Clock In</th>
+          <th data-t="att_out">Clock Out</th>
+          <th data-t="att_hours">Hours</th>
+          <th data-t="att_status">Status</th>
+        </tr>
+      </thead>
+      <tbody id="att-body">
+        <tr><td colspan="6" style="text-align:center;padding:30px;color:#9ca3af;" data-t="loading">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  loadAtt();
+  setInterval(function() {
+    var el = document.getElementById('time-now');
+    if (el) el.textContent = new Date().toLocaleTimeString('en-AE');
+  }, 1000);
+});
+
+function loadAtt() {
+  fetch('/api/attendance')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var tbody = document.getElementById('att-body');
+      if (!data.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#9ca3af;">' + t('no_data') + '</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.slice().reverse().map(function(r) {
+        return '<tr>' +
+          '<td><strong>' + (r.Name||r.EmpID) + '</strong></td>' +
+          '<td>' + (r.Date||'—') + '</td>' +
+          '<td>' + (r.ClockIn||'—') + '</td>' +
+          '<td>' + (r.ClockOut||'—') + '</td>' +
+          '<td>' + (r.Hours ? r.Hours + 'h' : '—') + '</td>' +
+          '<td><span class="badge ' + (r.ClockOut ? 'badge-success' : 'badge-warning') + '">' + (r.Status||'Present') + '</span></td>' +
+        '</tr>';
+      }).join('');
+    });
+}
+
+function doClock(type) {
+  var url = type === 'in' ? '/api/attendance/clockin' : '/api/attendance/clockout';
+  fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}})
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      var el = document.getElementById('clock-result');
+      el.style.display = 'block';
+      if (d.success) {
+        el.style.background = '#dcfce7'; el.style.color = '#16a34a';
+        el.textContent = '✅ ' + (type === 'in' ? t('att_success_in') : t('att_success_out')) + ' — ' + d.time;
+        loadAtt();
+      } else {
+        el.style.background = '#fef3c7'; el.style.color = '#d97706';
+        el.textContent = '⚠️ ' + d.msg;
+      }
+    });
+}
+</script>
+{% endblock %}

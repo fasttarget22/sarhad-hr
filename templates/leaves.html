@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% set page = "leaves" %}
+{% block page_title %}<span data-t="nav_leaves">Leave</span>{% endblock %}
+
+{% block content %}
+<div class="flex-between section-gap">
+  <div></div>
+  <button class="btn btn-primary" onclick="openModal()">
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <span data-t="leave_apply">Apply Leave</span>
+  </button>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th data-t="emp_name">Employee</th>
+          <th data-t="leave_type">Type</th>
+          <th data-t="leave_from">From</th>
+          <th data-t="leave_to">To</th>
+          <th data-t="leave_days">Days</th>
+          <th data-t="leave_reason">Reason</th>
+          <th data-t="leave_status">Status</th>
+          {% if user.role == 'Admin' %}<th>Action</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody id="leave-body">
+        <tr><td colspan="9" style="text-align:center;padding:30px;color:#9ca3af;" data-t="loading">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 data-t="leave_apply">Apply Leave</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label data-t="leave_type">Leave Type</label>
+          <select class="form-control" id="f-ltype">
+            <option data-t="leave_annual">Annual Leave</option>
+            <option data-t="leave_sick">Sick Leave</option>
+            <option data-t="leave_emergency">Emergency Leave</option>
+            <option data-t="leave_unpaid">Unpaid Leave</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label data-t="leave_days">Days</label>
+          <input class="form-control" id="f-ldays" type="number" min="1" value="1">
+        </div>
+        <div class="form-group">
+          <label data-t="leave_from">From Date</label>
+          <input class="form-control" id="f-lfrom" type="date">
+        </div>
+        <div class="form-group">
+          <label data-t="leave_to">To Date</label>
+          <input class="form-control" id="f-lto" type="date">
+        </div>
+        <div class="form-group" style="grid-column:1/-1;">
+          <label data-t="leave_reason">Reason</label>
+          <input class="form-control" id="f-lreason" data-tp="leave_reason" placeholder="Reason">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()" data-t="cancel">Cancel</button>
+      <button class="btn btn-primary" onclick="saveLeave()" data-t="save">Save</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var isAdmin = '{{ user.role }}' === 'Admin';
+document.addEventListener('DOMContentLoaded', loadLeaves);
+
+function loadLeaves() {
+  fetch('/api/leaves')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var tbody = document.getElementById('leave-body');
+      if (!data.length) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:#9ca3af;">' + t('no_data') + '</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.slice().reverse().map(function(r) {
+        var sc = {Pending:'badge-warning', Approved:'badge-success', Rejected:'badge-danger'}[r.Status] || 'badge-gray';
+        var actionCol = isAdmin
+          ? '<td>' + (r.Status === 'Pending'
+              ? '<button class="btn btn-success btn-sm" onclick="actLeave(\'' + r.LeaveID + '\',\'Approved\')" data-t="approve">Approve</button> ' +
+                '<button class="btn btn-danger btn-sm" onclick="actLeave(\'' + r.LeaveID + '\',\'Rejected\')" data-t="reject">Reject</button>'
+              : '—') + '</td>'
+          : '';
+        return '<tr>' +
+          '<td><code>' + r.LeaveID + '</code></td>' +
+          '<td>' + (r.Name||r.EmpID) + '</td>' +
+          '<td>' + (r.LeaveType||'—') + '</td>' +
+          '<td>' + (r.FromDate||'—') + '</td>' +
+          '<td>' + (r.ToDate||'—') + '</td>' +
+          '<td>' + (r.Days||'—') + '</td>' +
+          '<td>' + (r.Reason||'—') + '</td>' +
+          '<td><span class="badge ' + sc + '">' + (r.Status||'Pending') + '</span></td>' +
+          actionCol + '</tr>';
+      }).join('');
+    });
+}
+
+function actLeave(lid, status) {
+  fetch('/api/leaves/' + lid + '/approve', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({status: status})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d) {
+    if (d.success) { showToast(status, 'success'); loadLeaves(); }
+  });
+}
+
+function openModal() { document.getElementById('modal').classList.add('open'); }
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+function saveLeave() {
+  fetch('/api/leaves', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      type: document.getElementById('f-ltype').value,
+      from_date: document.getElementById('f-lfrom').value,
+      to_date: document.getElementById('f-lto').value,
+      days: document.getElementById('f-ldays').value,
+      reason: document.getElementById('f-lreason').value
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d) {
+    if (d.success) { showToast(t('success'), 'success'); closeModal(); loadLeaves(); }
+  });
+}
+</script>
+{% endblock %}

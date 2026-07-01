@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% set page = "employees" %}
+{% block page_title %}<span data-t="nav_employees">Employees</span>{% endblock %}
+
+{% block content %}
+<div class="flex-between section-gap">
+  <div class="search-bar">
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input class="form-control" id="search" style="width:240px;" data-tp="search" placeholder="Search..." oninput="filterEmps()">
+  </div>
+  {% if user.role == 'Admin' %}
+  <button class="btn btn-primary" onclick="openModal()">
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <span data-t="emp_add">Add Employee</span>
+  </button>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table id="emp-table">
+      <thead>
+        <tr>
+          <th data-t="emp_id">ID</th>
+          <th data-t="emp_name">Name</th>
+          <th data-t="emp_dept">Department</th>
+          <th data-t="emp_desig">Designation</th>
+          <th data-t="emp_nat">Nationality</th>
+          <th data-t="emp_type">Type</th>
+          <th data-t="emp_role">Role</th>
+          <th data-t="emp_phone">Phone</th>
+        </tr>
+      </thead>
+      <tbody id="emp-body">
+        <tr><td colspan="8" class="empty-state"><div class="empty-icon">👥</div><p data-t="loading">Loading...</p></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add Employee Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 data-t="emp_add">Add Employee</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label data-t="emp_name">Full Name</label>
+          <input class="form-control" id="f-name" data-tp="emp_name" placeholder="Full Name">
+        </div>
+        <div class="form-group">
+          <label data-t="emp_dept">Department</label>
+          <select class="form-control" id="f-dept">
+            <option>Operations</option><option>Transport</option><option>Admin</option><option>Finance</option><option>HR</option><option>Logistics</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label data-t="emp_desig">Designation</label>
+          <input class="form-control" id="f-desig" data-tp="emp_desig" placeholder="Designation">
+        </div>
+        <div class="form-group">
+          <label data-t="emp_nat">Nationality</label>
+          <select class="form-control" id="f-nat">
+            <option>Pakistani</option><option>Indian</option><option>Nepali</option><option>Filipino</option><option>Bangladeshi</option><option>Sri Lankan</option><option>Emirati</option><option>Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label data-t="emp_phone">Phone</label>
+          <input class="form-control" id="f-phone" placeholder="+971 50 000 0000">
+        </div>
+        <div class="form-group">
+          <label data-t="emp_email">Email</label>
+          <input class="form-control" id="f-email" type="email" placeholder="email@company.com">
+        </div>
+        <div class="form-group">
+          <label data-t="emp_join">Join Date</label>
+          <input class="form-control" id="f-join" type="date">
+        </div>
+        <div class="form-group">
+          <label data-t="emp_salary">Basic Salary (AED)</label>
+          <input class="form-control" id="f-salary" type="number" placeholder="2500">
+        </div>
+        <div class="form-group">
+          <label data-t="emp_type">Staff Type</label>
+          <select class="form-control" id="f-type">
+            <option>Driver</option><option>Office</option><option>WFH</option><option>Clerical</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label data-t="emp_role">Role</label>
+          <select class="form-control" id="f-role">
+            <option>Employee</option><option>Admin</option><option>Manager</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input class="form-control" id="f-pass" type="text" placeholder="Default: 1234">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()" data-t="cancel">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEmployee()" data-t="save">Save</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var allEmps = [];
+
+document.addEventListener('DOMContentLoaded', loadEmployees);
+
+function loadEmployees() {
+  fetch('/api/employees')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      allEmps = data;
+      renderEmps(data);
+    });
+}
+
+function renderEmps(data) {
+  var tbody = document.getElementById('emp-body');
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">👥</div><p>' + t('no_data') + '</p></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map(function(e) {
+    return '<tr>' +
+      '<td><span class="badge badge-info">' + e.EmpID + '</span></td>' +
+      '<td><strong>' + e.Name + '</strong></td>' +
+      '<td>' + (e.Department||'—') + '</td>' +
+      '<td>' + (e.Designation||'—') + '</td>' +
+      '<td>' + (e.Nationality||'—') + '</td>' +
+      '<td><span class="badge badge-gray">' + (e.StaffType||'—') + '</span></td>' +
+      '<td><span class="badge ' + (e.Role==='Admin'?'badge-gold':'badge-success') + '">' + (e.Role||'Employee') + '</span></td>' +
+      '<td>' + (e.Phone||'—') + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function filterEmps() {
+  var q = document.getElementById('search').value.toLowerCase();
+  renderEmps(allEmps.filter(function(e) {
+    return (e.Name||'').toLowerCase().includes(q) || (e.Department||'').toLowerCase().includes(q) || (e.EmpID||'').toLowerCase().includes(q);
+  }));
+}
+
+function openModal() { document.getElementById('modal').classList.add('open'); }
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+function saveEmployee() {
+  var data = {
+    name: document.getElementById('f-name').value,
+    department: document.getElementById('f-dept').value,
+    designation: document.getElementById('f-desig').value,
+    nationality: document.getElementById('f-nat').value,
+    phone: document.getElementById('f-phone').value,
+    email: document.getElementById('f-email').value,
+    join_date: document.getElementById('f-join').value,
+    salary: document.getElementById('f-salary').value,
+    staff_type: document.getElementById('f-type').value,
+    role: document.getElementById('f-role').value,
+    password: document.getElementById('f-pass').value || '1234'
+  };
+  fetch('/api/employees', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(data)
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d) {
+    if (d.success) {
+      showToast(t('success') + ' — ' + d.id, 'success');
+      closeModal();
+      loadEmployees();
+    } else {
+      showToast(d.msg || t('error'), 'error');
+    }
+  });
+}
+</script>
+{% endblock %}

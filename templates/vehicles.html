@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% set page = "vehicles" %}
+{% block page_title %}<span data-t="nav_vehicles">Vehicles</span>{% endblock %}
+
+{% block content %}
+<div class="flex-between section-gap">
+  <div></div>
+  {% if user.role == 'Admin' %}
+  <button class="btn btn-primary" onclick="openModal()">
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <span data-t="veh_add">Add Vehicle</span>
+  </button>
+  {% endif %}
+</div>
+
+<div id="veh-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;"></div>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 data-t="veh_add">Add Vehicle</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label data-t="veh_plate">Number Plate</label>
+          <input class="form-control" id="f-plate" placeholder="Dubai A 12345">
+        </div>
+        <div class="form-group">
+          <label data-t="veh_make">Make</label>
+          <input class="form-control" id="f-make" placeholder="Toyota">
+        </div>
+        <div class="form-group">
+          <label data-t="veh_model">Model</label>
+          <input class="form-control" id="f-model" placeholder="Hiace">
+        </div>
+        <div class="form-group">
+          <label data-t="veh_year">Year</label>
+          <input class="form-control" id="f-year" type="number" placeholder="2022">
+        </div>
+        <div class="form-group">
+          <label data-t="veh_type">Type</label>
+          <select class="form-control" id="f-vtype">
+            <option>Truck</option><option>Van</option><option>Bus</option><option>Car</option><option>Pickup</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label data-t="veh_color">Color</label>
+          <input class="form-control" id="f-color" placeholder="White">
+        </div>
+        <div class="form-group">
+          <label data-t="veh_driver">Assigned Driver</label>
+          <input class="form-control" id="f-driver" placeholder="Driver Name">
+        </div>
+        <div class="form-group">
+          <label data-t="veh_ins">Insurance Expiry</label>
+          <input class="form-control" id="f-ins" type="date">
+        </div>
+        <div class="form-group">
+          <label data-t="veh_reg">Registration Expiry</label>
+          <input class="form-control" id="f-reg" type="date">
+        </div>
+        <div class="form-group">
+          <label data-t="veh_fit">Fitness Certificate</label>
+          <input class="form-control" id="f-fit" type="date">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()" data-t="cancel">Cancel</button>
+      <button class="btn btn-primary" onclick="saveVeh()" data-t="save">Save</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', loadVehicles);
+
+function statusColor(s) {
+  return {Valid:'#16a34a', Expiring:'#d97706', Critical:'#dc2626', Expired:'#374151'}[s] || '#6b7c93';
+}
+function statusBadge(s) {
+  return {Valid:'badge-success', Expiring:'badge-warning', Critical:'badge-danger', Expired:'badge-gray'}[s] || 'badge-gray';
+}
+
+function loadVehicles() {
+  fetch('/api/vehicles')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var grid = document.getElementById('veh-grid');
+      if (!data.length) {
+        grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🚛</div><p>' + t('no_data') + '</p></div>';
+        return;
+      }
+      grid.innerHTML = data.map(function(v) {
+        var ins = v.InsuranceExpiry_Status || '—';
+        var reg = v.RegistrationExpiry_Status || '—';
+        var fit = v.FitnessExpiry_Status || '—';
+        return '<div class="card">' +
+          '<div class="card-header">' +
+            '<div>' +
+              '<h3>🚛 ' + (v.Plate||'—') + '</h3>' +
+              '<p style="font-size:12px;color:#6b7c93;margin-top:3px;">' + (v.Make||'') + ' ' + (v.Model||'') + ' ' + (v.Year||'') + '</p>' +
+            '</div>' +
+            '<span class="badge badge-info">' + (v.Type||'—') + '</span>' +
+          '</div>' +
+          '<div class="card-body">' +
+            '<div style="display:grid;gap:8px;">' +
+              '<div style="display:flex;justify-content:space-between;font-size:13px;">' +
+                '<span style="color:#6b7c93;" data-t="veh_driver">Driver</span>' +
+                '<strong>' + (v.AssignedDriver||'—') + '</strong>' +
+              '</div>' +
+              '<div style="display:flex;justify-content:space-between;font-size:13px;">' +
+                '<span style="color:#6b7c93;" data-t="veh_ins">Insurance</span>' +
+                '<span class="badge ' + statusBadge(ins) + '">' + (v.InsuranceExpiry||'—') + '</span>' +
+              '</div>' +
+              '<div style="display:flex;justify-content:space-between;font-size:13px;">' +
+                '<span style="color:#6b7c93;" data-t="veh_reg">Mulkiya</span>' +
+                '<span class="badge ' + statusBadge(reg) + '">' + (v.RegistrationExpiry||'—') + '</span>' +
+              '</div>' +
+              '<div style="display:flex;justify-content:space-between;font-size:13px;">' +
+                '<span style="color:#6b7c93;" data-t="veh_fit">Fitness</span>' +
+                '<span class="badge ' + statusBadge(fit) + '">' + (v.FitnessExpiry||'—') + '</span>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    });
+}
+
+function openModal() { document.getElementById('modal').classList.add('open'); }
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+function saveVeh() {
+  fetch('/api/vehicles', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      plate: document.getElementById('f-plate').value,
+      make: document.getElementById('f-make').value,
+      model: document.getElementById('f-model').value,
+      year: document.getElementById('f-year').value,
+      type: document.getElementById('f-vtype').value,
+      color: document.getElementById('f-color').value,
+      assigned_driver: document.getElementById('f-driver').value,
+      insurance_expiry: document.getElementById('f-ins').value,
+      reg_expiry: document.getElementById('f-reg').value,
+      fitness_expiry: document.getElementById('f-fit').value
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d) {
+    if (d.success) { showToast(t('success'), 'success'); closeModal(); loadVehicles(); }
+  });
+}
+</script>
+{% endblock %}

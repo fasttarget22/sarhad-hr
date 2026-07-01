@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sarhad Express HR — Login</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div class="login-page">
+  <div class="login-card">
+    <div class="login-logo">🚛</div>
+    <div class="login-company" id="lc-company">Sarhad Express HR</div>
+    <div class="login-sub" id="lc-sub">Dubai, UAE — Company Code: 574758</div>
+
+    <div class="login-lang">
+      <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+      <button class="lang-btn" data-lang="ar" onclick="setLang('ar')">عربي</button>
+      <button class="lang-btn" data-lang="ur" onclick="setLang('ur')">اردو</button>
+    </div>
+
+    <div class="form-group" style="margin-bottom:14px;text-align:left;">
+      <label data-t="login_id">Employee ID</label>
+      <input class="form-control" id="emp_id" type="text" data-tp="login_id" placeholder="Employee ID" autofocus>
+    </div>
+    <div class="form-group" style="margin-bottom:22px;text-align:left;">
+      <label data-t="login_pass">Password</label>
+      <input class="form-control" id="password" type="password" data-tp="login_pass" placeholder="Password">
+    </div>
+
+    <div id="login-error" style="color:#dc2626;font-size:12px;margin-bottom:14px;display:none;" data-t="login_error">Invalid credentials</div>
+
+    <button class="btn btn-primary btn-block btn-lg" onclick="doLogin()" id="login-btn">
+      <span data-t="login_btn">Login</span>
+    </button>
+
+    <div style="margin-top:24px;padding-top:18px;border-top:1px solid #e5e7eb;">
+      <p style="font-size:11px;color:#9ca3af;">🔒 Sarhad Express Land Transport LLC</p>
+      <p style="font-size:10px;color:#d1d5db;margin-top:3px;">Powered by HR System v1.0</p>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/lang.js"></script>
+<script>
+document.getElementById('password').addEventListener('keypress', function(e) {
+  if (e.key === 'Enter') doLogin();
+});
+
+function doLogin() {
+  var id = document.getElementById('emp_id').value.trim();
+  var pw = document.getElementById('password').value.trim();
+  var btn = document.getElementById('login-btn');
+  var err = document.getElementById('login-error');
+  err.style.display = 'none';
+  btn.disabled = true;
+  btn.querySelector('span').textContent = t('loading');
+
+  fetch('/api/login', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({emp_id: id, password: pw})
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.success) {
+      window.location.href = '/dashboard';
+    } else {
+      err.style.display = 'block';
+      btn.disabled = false;
+      btn.querySelector('span').textContent = t('login_btn');
+    }
+  })
+  .catch(function() {
+    err.style.display = 'block';
+    btn.disabled = false;
+    btn.querySelector('span').textContent = t('login_btn');
+  });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  applyLang();
+  document.getElementById('lc-company').textContent = t('company');
+  document.getElementById('lc-sub').textContent = t('tagline');
+});
+</script>
+</body>
+</html>

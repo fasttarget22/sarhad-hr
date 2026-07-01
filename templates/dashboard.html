@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% set page = "dashboard" %}
+{% block page_title %}<span data-t="nav_dashboard">Dashboard</span>{% endblock %}
+
+{% block content %}
+<div id="welcome-bar" style="background:linear-gradient(135deg,#0f2540,#1a3a5c);border-radius:14px;padding:22px 28px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+  <div>
+    <p style="color:#a8c4e0;font-size:12px;margin-bottom:4px;" data-t="dash_welcome">Welcome back</p>
+    <h2 style="color:#fff;font-size:20px;font-weight:800;">{{ user.name }}</h2>
+    <p style="color:#c8a84b;font-size:12px;margin-top:3px;">{{ user.dept }} · {{ user.role }}</p>
+  </div>
+  <div style="text-align:right;">
+    <div style="font-size:32px;">🚛</div>
+    <p style="color:#a8c4e0;font-size:11px;margin-top:4px;" data-t="company">Sarhad Express Land Transport LLC</p>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="stats-grid" id="stats-grid">
+  <div class="stat-card blue">
+    <div class="stat-icon">👥</div>
+    <div class="stat-value" id="st-emp">—</div>
+    <div class="stat-label" data-t="dash_total_emp">Total Employees</div>
+  </div>
+  <div class="stat-card green">
+    <div class="stat-icon">✅</div>
+    <div class="stat-value" id="st-present">—</div>
+    <div class="stat-label" data-t="dash_present">Present Today</div>
+  </div>
+  <div class="stat-card orange">
+    <div class="stat-icon">🏖️</div>
+    <div class="stat-value" id="st-leaves">—</div>
+    <div class="stat-label" data-t="dash_pending_leave">Pending Leaves</div>
+  </div>
+  <div class="stat-card red">
+    <div class="stat-icon">⚠️</div>
+    <div class="stat-value" id="st-docs">—</div>
+    <div class="stat-label" data-t="dash_expiring_docs">Expiring Docs</div>
+  </div>
+  <div class="stat-card gold">
+    <div class="stat-icon">📋</div>
+    <div class="stat-value" id="st-tasks">—</div>
+    <div class="stat-label" data-t="dash_pending_tasks">Pending Tasks</div>
+  </div>
+</div>
+
+<!-- Quick Actions -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;">
+  <!-- Clock In/Out -->
+  <div class="card">
+    <div class="card-header"><h3 data-t="nav_attendance">Attendance</h3></div>
+    <div class="card-body">
+      <div class="clock-btns">
+        <button class="clock-btn clock-btn-in" onclick="quickClock('in')">
+          <span class="clock-icon">🟢</span>
+          <span data-t="att_clockin">Clock In</span>
+        </button>
+        <button class="clock-btn clock-btn-out" onclick="quickClock('out')">
+          <span class="clock-icon">🔴</span>
+          <span data-t="att_clockout">Clock Out</span>
+        </button>
+      </div>
+      <div id="clock-msg" style="text-align:center;font-size:13px;color:#6b7c93;"></div>
+    </div>
+  </div>
+
+  <!-- Quick Links -->
+  <div class="card">
+    <div class="card-header"><h3>Quick Access</h3></div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <a href="/leaves" class="btn btn-outline" style="justify-content:center;flex-direction:column;padding:16px;gap:6px;">
+          <span style="font-size:22px;">🏖️</span>
+          <span data-t="nav_leaves" style="font-size:12px;">Leave</span>
+        </a>
+        <a href="/documents" class="btn btn-outline" style="justify-content:center;flex-direction:column;padding:16px;gap:6px;">
+          <span style="font-size:22px;">📄</span>
+          <span data-t="nav_documents" style="font-size:12px;">Documents</span>
+        </a>
+        <a href="/tasks" class="btn btn-outline" style="justify-content:center;flex-direction:column;padding:16px;gap:6px;">
+          <span style="font-size:22px;">📋</span>
+          <span data-t="nav_tasks" style="font-size:12px;">Tasks</span>
+        </a>
+        <a href="/payroll" class="btn btn-outline" style="justify-content:center;flex-direction:column;padding:16px;gap:6px;">
+          <span style="font-size:22px;">💰</span>
+          <span data-t="nav_payroll" style="font-size:12px;">Payroll</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  loadStats();
+});
+
+function loadStats() {
+  fetch('/api/stats')
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      document.getElementById('st-emp').textContent = d.total_employees || 0;
+      document.getElementById('st-present').textContent = d.today_present || 0;
+      document.getElementById('st-leaves').textContent = d.pending_leaves || 0;
+      document.getElementById('st-docs').textContent = d.expiring_docs || 0;
+      document.getElementById('st-tasks').textContent = d.pending_tasks || 0;
+    });
+}
+
+function quickClock(type) {
+  var url = type === 'in' ? '/api/attendance/clockin' : '/api/attendance/clockout';
+  fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}})
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      var msg = document.getElementById('clock-msg');
+      if (d.success) {
+        var text = type === 'in' ? t('att_success_in') : t('att_success_out');
+        if (d.hours) text += ' (' + d.hours + ' hrs)';
+        msg.textContent = '✅ ' + text + ' — ' + d.time;
+        msg.style.color = '#16a34a';
+        showToast(text, 'success');
+      } else {
+        msg.textContent = '⚠️ ' + d.msg;
+        msg.style.color = '#d97706';
+        showToast(d.msg, 'warning');
+      }
+    });
+}
+</script>
+{% endblock %}
